@@ -11,7 +11,40 @@ export const metadata = {
   description: "One stop Finance Platform",
 };
 
+// ---------------------------------------------------------------------------
+// CI / build safety
+// ---------------------------------------------------------------------------
+// Clerk validates NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY at module-load time during
+// `next build`. If the value is absent or a placeholder the build crashes with:
+//   "The publishableKey passed to Clerk is invalid"
+//
+// During CI builds we set NEXT_PUBLIC_CI_BUILD=true so we can render a minimal
+// shell without ClerkProvider — this prevents the prerender crash while still
+// allowing the build to type-check and bundle all pages.
+//
+// In production (Vercel) and local dev, NEXT_PUBLIC_CI_BUILD is never set, so
+// ClerkProvider is always used normally.
+// ---------------------------------------------------------------------------
+const IS_CI_BUILD = process.env.NEXT_PUBLIC_CI_BUILD === "true";
+
 export default function RootLayout({ children }) {
+  // During CI build: wrap in a plain div instead of ClerkProvider.
+  // Auth-dependent UI (Header's SignedIn/SignedOut) renders nothing without
+  // Clerk context, which is fine — we only care that the build succeeds.
+  if (IS_CI_BUILD) {
+    return (
+      <html lang="en">
+        <head>
+          <link rel="icon" href="/logo-sm.png" sizes="any" />
+        </head>
+        <body className={inter.className}>
+          <main className="min-h-screen">{children}</main>
+          <Toaster richColors />
+        </body>
+      </html>
+    );
+  }
+
   return (
     <ClerkProvider fallbackRedirectUrl="/dashboard">
       <html lang="en">

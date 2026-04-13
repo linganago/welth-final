@@ -8,27 +8,35 @@ const isProtectedRoute = createRouteMatcher([
   "/transaction(.*)",
 ]);
 
-// Create Arcjet middleware
+// ---------------------------------------------------------------------------
+// ArcJet mode selection
+// ---------------------------------------------------------------------------
+// In CI (ARCJET_ENV=ci) and during E2E tests, we switch detectBot to DRY_RUN
+// so Playwright's headless Chromium and GitHub Actions runners are never
+// blocked. In production this is always LIVE.
+//
+// Set ARCJET_ENV=ci in your GitHub Actions env block for the E2E job.
+// ---------------------------------------------------------------------------
+const ARCJET_BOT_MODE =
+  process.env.ARCJET_ENV === "ci" ||
+  process.env.NODE_ENV === "test"
+    ? "DRY_RUN"
+    : "LIVE";
+
 const aj = arcjet({
   key: process.env.ARCJET_KEY,
-  // characteristics: ["userId"], // Track based on Clerk userId
   rules: [
-    // Shield protection for content and security
-    shield({
-      mode: "LIVE",
-    }),
+    shield({ mode: "LIVE" }),
     detectBot({
-      mode: "LIVE", // will block requests. Use "DRY_RUN" to log only
+      mode: ARCJET_BOT_MODE,
       allow: [
-        "CATEGORY:SEARCH_ENGINE", // Google, Bing, etc
+        "CATEGORY:SEARCH_ENGINE",
         "GO_HTTP", // For Inngest
-        // See the full list at https://arcjet.com/bot-list
       ],
     }),
   ],
 });
 
-// Create base Clerk middleware
 const clerk = clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
 
@@ -40,14 +48,11 @@ const clerk = clerkMiddleware(async (auth, req) => {
   return NextResponse.next();
 });
 
-// Chain middlewares - ArcJet runs first, then Clerk
 export default createMiddleware(aj, clerk);
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
     "/(api|trpc)(.*)",
   ],
 };
