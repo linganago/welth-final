@@ -6,39 +6,8 @@ on:
   pull_request:
     branches: [main]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Environment variable strategy
-# ─────────────────────────────────────────────────────────────────────────────
-# Unit Tests    → all fake values hardcoded inline (no secrets needed)
-# Integration   → fake API keys + real Postgres service container
-# Build         → NEXT_PUBLIC_CI_BUILD=true skips ClerkProvider prerender
-#                 REAL Clerk publishable key from GitHub Secret (required)
-#                 all other keys can be fake for build purposes
-# E2E           → REAL Clerk publishable key + ARCJET_ENV=ci (DRY_RUN bots)
-#                 explicit user-agent in playwright.config.js
-# ─────────────────────────────────────────────────────────────────────────────
-#
-# REQUIRED GitHub Secrets (Settings → Secrets → Actions):
-#   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY  ← must be real (pk_test_... or pk_live_...)
-#   CLERK_SECRET_KEY                   ← must be real
-#   DATABASE_URL                       ← your real Supabase URL (for build only)
-#   DIRECT_URL                         ← your real Supabase direct URL
-#
-# OPTIONAL GitHub Secrets (build succeeds without them, features disabled):
-#   GEMINI_API_KEY
-#   RESEND_API_KEY
-#   ARCJET_KEY
-#   INNGEST_EVENT_KEY
-#   INNGEST_SIGNING_KEY
-#   NEXT_PUBLIC_SUPABASE_URL
-#   SUPABASE_SERVICE_ROLE_KEY
-#   SENTRY_DSN / SENTRY_ORG / SENTRY_PROJECT
-# ─────────────────────────────────────────────────────────────────────────────
-
 jobs:
   # ─── 1. Unit Tests ──────────────────────────────────────────────────────────
-  # All 43 unit tests. Zero real dependencies — everything mocked.
-  # Hardcoded fake env vars — no GitHub Secrets required for this job.
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -77,8 +46,6 @@ jobs:
           SENTRY_DSN: ""
 
   # ─── 2. Integration Tests ───────────────────────────────────────────────────
-  # Runs against a real Postgres container. No GitHub Secrets required.
-  # Uses prisma migrate deploy (NOT reset) — safe for CI containers.
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
@@ -116,8 +83,6 @@ jobs:
           DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
 
       - name: Apply migrations
-        # migrate deploy applies pending migrations without dropping data.
-        # migrate reset drops + recreates which requires superuser — avoid in CI.
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
@@ -141,12 +106,6 @@ jobs:
           SENTRY_DSN: ""
 
   # ─── 3. Build ───────────────────────────────────────────────────────────────
-  # Verifies next build succeeds.
-  # REQUIRES GitHub Secrets: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY,
-  #   DATABASE_URL, DIRECT_URL.
-  # NEXT_PUBLIC_CI_BUILD=true skips ClerkProvider so prerender never validates
-  # the Clerk key — the real key in secrets is still passed so Clerk's SDK init
-  # at import time succeeds (the SDK validates format at import, not just render).
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -172,28 +131,13 @@ jobs:
       - name: Build Next.js app
         run: npm run build
         env:
-          # ── NEXT_PUBLIC_CI_BUILD skips ClerkProvider in layout.js ──────────
-          # This is the key fix. With ClerkProvider removed from the render tree,
-          # Next.js prerendering never calls Clerk.init(), so an invalid/missing
-          # publishable key never causes a build failure.
           NEXT_PUBLIC_CI_BUILD: "true"
-
-          # ── Database ───────────────────────────────────────────────────────
-          # Must be real Supabase URLs — Prisma validates the connection string
-          # format at import time even during build.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-
-          # ── Clerk ──────────────────────────────────────────────────────────
-          # Must be real keys (correct pk_test_... / pk_live_... format).
-          # Clerk's SDK validates key FORMAT at import time — wrong format = crash.
-          # Even with NEXT_PUBLIC_CI_BUILD=true the SDK is still imported.
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in"
           NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
-
-          # ── Other services — fake values are fine for build ────────────────
           GEMINI_API_KEY: "build-placeholder"
           RESEND_API_KEY: "build-placeholder"
           ARCJET_KEY: "build-placeholder"
@@ -206,11 +150,6 @@ jobs:
           SENTRY_PROJECT: ""
 
   # ─── 4. E2E Tests ───────────────────────────────────────────────────────────
-  # Tests public pages only (no login required, no DB needed).
-  # ARCJET_ENV=ci switches detectBot to DRY_RUN in middleware.js.
-  # Explicit user-agent in playwright.config.js prevents ArcJet header errors.
-  # REQUIRES GitHub Secrets: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY,
-  #   DATABASE_URL, DIRECT_URL (needed to start the Next.js dev server).
   e2e-tests:
     name: E2E Tests (Auth Flow)
     runs-on: ubuntu-latest
@@ -223,6 +162,28 @@ jobs:
         with:
           node-version: 20
           cache: "npm"
+
+      - name: Check required secrets are set
+        run: |
+          if [ -z "$CLERK_PK" ]; then
+            echo "ERROR: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY secret is not set."
+            echo "Go to: GitHub repo → Settings → Secrets → Actions → New secret"
+            echo "Add: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = your pk_test_... value from Clerk dashboard"
+            exit 1
+          fi
+          if [ -z "$CLERK_SK" ]; then
+            echo "ERROR: CLERK_SECRET_KEY secret is not set."
+            exit 1
+          fi
+          if [ -z "$DB_URL" ]; then
+            echo "ERROR: DATABASE_URL secret is not set."
+            exit 1
+          fi
+          echo "All required secrets are present."
+        env:
+          CLERK_PK: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SK: ${{ secrets.CLERK_SECRET_KEY }}
+          DB_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
@@ -239,20 +200,13 @@ jobs:
       - name: Run E2E auth tests
         run: npx playwright test e2e/auth.spec.js --reporter=list
         env:
-          # ── ArcJet CI mode — switches detectBot to DRY_RUN ────────────────
           ARCJET_ENV: "ci"
-
-          # ── Database ───────────────────────────────────────────────────────
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-
-          # ── Clerk (real keys required — dev server validates at startup) ───
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in"
           NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
-
-          # ── Other services ─────────────────────────────────────────────────
           GEMINI_API_KEY: "test-key"
           RESEND_API_KEY: "test-key"
           ARCJET_KEY: "test-key"
@@ -261,8 +215,6 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: "test-key"
           SENTRY_DSN: ""
-
-          # ── Playwright ─────────────────────────────────────────────────────
           PLAYWRIGHT_BASE_URL: "http://localhost:3000"
 
       - name: Upload Playwright report on failure
