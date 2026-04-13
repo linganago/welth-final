@@ -1,0 +1,213 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── Unit Tests ─────────────────────────────────────────────────────────────
+  # Runs 43 unit tests with zero real dependencies.
+  # All external services (DB, Clerk, ArcJet) are mocked.
+  # This job ALWAYS runs and must pass before anything else.
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+
+      - name: Run unit tests
+        run: npm test
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+          GEMINI_API_KEY: "test-key"
+          ARCJET_KEY: "test-key"
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_xxx"
+          CLERK_SECRET_KEY: "sk_test_xxx"
+          RESEND_API_KEY: "test-key"
+          INNGEST_EVENT_KEY: "test-key"
+          INNGEST_SIGNING_KEY: "test-key"
+          NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co"
+          SUPABASE_SERVICE_ROLE_KEY: "test-key"
+          SENTRY_DSN: ""
+
+  # ─── Integration Tests ───────────────────────────────────────────────────────
+  # Runs against a REAL Postgres service container spun up by GitHub Actions.
+  # Does NOT need any of your real API keys — only the DB connection.
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: welth_test
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+
+      - name: Apply migrations to test database
+        run: npx prisma migrate reset --force
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+
+      - name: Run integration tests
+        run: npx vitest run --config ./vitest.integration.config.js
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+          TEST_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/welth_test"
+          GEMINI_API_KEY: "test-key"
+          ARCJET_KEY: "test-key"
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_xxx"
+          CLERK_SECRET_KEY: "sk_test_xxx"
+          RESEND_API_KEY: "test-key"
+          INNGEST_EVENT_KEY: "test-key"
+          INNGEST_SIGNING_KEY: "test-key"
+          NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co"
+          SUPABASE_SERVICE_ROLE_KEY: "test-key"
+          SENTRY_DSN: ""
+
+  # ─── Build Check ─────────────────────────────────────────────────────────────
+  # Verifies `npm run build` succeeds with real secrets from GitHub Secrets.
+  # Uses dummy values for secrets that are optional (Sentry).
+  # Only runs after unit tests pass.
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/welth_test' }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://postgres:postgres@localhost:5432/welth_test' }}
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/welth_test' }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://postgres:postgres@localhost:5432/welth_test' }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in"
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'test-key' }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || 'test-key' }}
+          ARCJET_KEY: ${{ secrets.ARCJET_KEY || 'test-key' }}
+          INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY || 'test-key' }}
+          INNGEST_SIGNING_KEY: ${{ secrets.INNGEST_SIGNING_KEY || 'test-key' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'test-key' }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN || '' }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG || '' }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT || '' }}
+
+  # ─── E2E Tests (Auth Flow) ───────────────────────────────────────────────────
+  # Tests only the PUBLIC pages (landing, sign-in redirect, sign-up redirect).
+  # These do NOT require a running database or real Clerk credentials.
+  # Only runs after unit tests pass.
+  e2e-tests:
+    name: E2E Tests (Auth Flow)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/welth_test' }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://postgres:postgres@localhost:5432/welth_test' }}
+
+      - name: Run E2E auth tests
+        run: npx playwright test e2e/auth.spec.js --reporter=list
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/welth_test' }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://postgres:postgres@localhost:5432/welth_test' }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in"
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'test-key' }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || 'test-key' }}
+          ARCJET_KEY: ${{ secrets.ARCJET_KEY || 'test-key' }}
+          INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY || 'test-key' }}
+          INNGEST_SIGNING_KEY: ${{ secrets.INNGEST_SIGNING_KEY || 'test-key' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'test-key' }}
+          SENTRY_DSN: ""
+          PLAYWRIGHT_BASE_URL: "http://localhost:3000"
+
+      - name: Upload Playwright report on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
