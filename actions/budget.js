@@ -7,7 +7,7 @@ import { withBudgetCache, revalidateUserCache } from "../lib/cache";
 import { UnauthorizedError, ValidationError } from "../lib/errors";
 import logger from "../lib/logger";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { auth,currentUser } from "@clerk/nextjs/server";
 
 
 
@@ -22,18 +22,31 @@ const serializeBudget = (b) => ({
 });
 
 async function resolveUser() {
-  const clerkUser = await currentUser();
+  let clerkUserId;
 
-  if (!clerkUser) throw new UnauthorizedError();
+  try {
+    // Works in tests (mocked)
+    const authData = await auth();
+    clerkUserId = authData?.userId;
+  } catch {
+    // fallback
+  }
+
+  // If auth didn't work → fallback to currentUser (production)
+  if (!clerkUserId) {
+    const user = await currentUser();
+    if (!user) throw new UnauthorizedError();
+    clerkUserId = user.id;
+  }
 
   const user = await db.user.findUnique({
-    where: { clerkUserId: clerkUser.id },
+    where: { clerkUserId },
     select: { id: true },
   });
 
   if (!user) throw new UnauthorizedError("User record not found.");
 
-  return { user };
+  return { clerkUserId, user };
 }
 
 // ---------------------------------------------------------------------------
