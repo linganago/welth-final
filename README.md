@@ -1,24 +1,61 @@
 # Welth — AI-Powered Personal Finance Platform
 
-[![CI](https://github.com/YOUR_USERNAME/welth-upgraded/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/welth-upgraded/actions/workflows/ci.yml)
+[![CI](https://github.com/linganago/welth-final/actions/workflows/ci.yml/badge.svg)](https://github.com/linganago/welth-final/actions/workflows/ci.yml)
+[![Vercel](https://img.shields.io/badge/deployed-Vercel-black?logo=vercel)](https://welth-final-mds3vkng5-linganagoudas-projects.vercel.app)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org)
+[![Tests](https://img.shields.io/badge/tests-43%20passing-brightgreen)](https://github.com/linganago/welth-final/actions)
 
-A production-grade personal finance management platform built with Next.js 15, demonstrating advanced full-stack engineering patterns used at top product companies.
+A **production-grade personal finance management platform** built with Next.js 15 App Router, demonstrating advanced full-stack engineering patterns used at top product companies including idempotency, cursor pagination, event-driven architecture, and AI integration.
 
-**Live demo:** [welth-seven-vert.vercel.app](https://welth-seven-vert.vercel.app)
+**Live demo:** [welth-final-mds3vkng5-linganagoudas-projects.vercel.app](https://welth-final-mds3vkng5-linganagoudas-projects.vercel.app)
 
 ---
 
-## Architecture highlights
+## What it does
 
-- **Cursor-based pagination** on the transaction feed — replaces unbounded `findMany` with O(log n) index scans using the `(userId, type, date DESC)` composite index
-- **Idempotency keys** on all financial mutations — client generates a UUID per form session, server deduplicates on `findUnique({ idempotencyKey })` before inserting, preventing double-transactions on network retries
-- **ACID-compliant balance updates** — every transaction create/update/delete uses `db.$transaction()` to atomically update both the transaction row and account balance, preventing balance corruption under concurrent writes
-- **Tag-based cache invalidation** — dashboard and account data cached via `unstable_cache` with per-user tags; any mutation calls `revalidateTag` on exactly the affected tags for instant freshness
-- **Event-driven background jobs** — Inngest processes recurring transactions via daily cron with per-user throttling (10 events/min), sends AI-generated monthly reports via Resend, and fires budget alerts every 6 hours
-- **AI receipt OCR** — Gemini 2.5 Flash extracts structured JSON from receipt images; image uploaded to Supabase Storage in parallel with the AI call; `receiptUrl` persisted on the transaction row
-- **Per-category budgets** — users can set individual monthly budgets per expense category alongside a global budget; progress tracked in real time against current-month spending
-- **CSV export** — server-side streaming export of filtered transactions to a downloadable `.csv` file
-- **Structured error hierarchy** — typed `AppError` subclasses (Unauthorized, NotFound, Validation, RateLimit) with Prisma error code mapping; all logged via structured JSON logger
+- Track income and expenses across multiple bank accounts
+- AI-powered receipt scanning — upload a photo, Gemini extracts the data
+- Set monthly budgets per spending category with real-time progress tracking
+- Recurring transactions processed automatically via daily background jobs
+- AI-generated monthly financial reports delivered by email
+- Anomaly detection — get alerted when a transaction is statistically unusual
+- Export transactions to CSV
+- Full authentication, bot protection, and rate limiting
+
+---
+
+## Engineering highlights
+
+### Financial correctness
+- **ACID-compliant balance updates** — every transaction mutation uses `db.$transaction()` to atomically update both the transaction row and account balance, preventing corruption under concurrent writes
+- **Idempotency keys** — client generates a UUID per form session, server deduplicates via `findUnique({ idempotencyKey })` before inserting, making create operations safe to retry on network failure (same pattern used by Stripe)
+
+### Performance
+- **Cursor-based pagination** — replaces unbounded `findMany` with O(log n) index scans using a `(userId, type, date DESC)` composite Postgres index; infinite scroll via IntersectionObserver
+- **Tag-based cache invalidation** — dashboard data cached with `unstable_cache` using per-user tags; any write mutation calls `revalidateTag` on exactly the affected tags, guaranteeing freshness within seconds
+- **Optimistic UI** — React 19 `useOptimistic` makes deletions appear instant in the UI, with automatic rollback if the server rejects
+
+### Background jobs (Inngest)
+- Daily cron processes recurring transactions with per-user throttling (10 events/min)
+- Monthly AI report generation using Gemini 2.5 Flash, delivered via Resend
+- 6-hourly budget alerts when spending crosses 80% of limit
+- **Statistical anomaly detection** — z-score algorithm flags transactions more than 2 standard deviations above the 3-month category average
+
+### AI integration
+- Receipt OCR via Gemini 2.5 Flash — image upload to Supabase Storage and AI scan run in parallel; structured JSON output validated before DB write
+- AI-generated financial insights in monthly email reports
+- Anomaly explanations generated by Gemini and delivered in plain English
+
+### Security
+- ArcJet middleware chain: bot detection + shield + token-bucket rate limiting (10 req/hr on writes)
+- Clerk authentication with protected route middleware
+- Typed error hierarchy (`AppError` → `UnauthorizedError`, `NotFoundError`, `ValidationError`, `RateLimitError`) mapping Prisma constraint violations to HTTP-equivalent status codes
+
+### Testing & CI/CD
+- 43 unit tests with Vitest, full mock isolation, zero real dependencies
+- Integration tests run against a disposable Postgres service container in GitHub Actions
+- E2E tests with Playwright covering authentication flows
+- GitHub Actions CI: unit tests → integration tests → build check → E2E tests on every push
 
 ---
 
@@ -27,6 +64,7 @@ A production-grade personal finance management platform built with Next.js 15, d
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 15 (App Router, Server Actions) |
+| Language | JavaScript (ES2024) |
 | Database | PostgreSQL via Prisma ORM (Supabase) |
 | Auth | Clerk |
 | Background jobs | Inngest |
@@ -35,23 +73,9 @@ A production-grade personal finance management platform built with Next.js 15, d
 | Email | Resend + React Email |
 | Security | ArcJet (bot detection, rate limiting, shield) |
 | Error monitoring | Sentry |
-| Testing | Vitest (unit) + Playwright-ready (E2E) |
+| Testing | Vitest (unit + integration) + Playwright (E2E) |
 | CI/CD | GitHub Actions |
 | Deployment | Vercel |
-
----
-
-## Resume bullet points
-
-- Architected a fintech platform with ACID-compliant balance updates using Prisma database transactions, preventing balance corruption under concurrent writes
-- Implemented cursor-based pagination replacing unbounded full-table scans, reducing dashboard query complexity from O(n) to O(log n) via composite Postgres indexes
-- Built an idempotency key system on all financial mutations — UUID generated client-side, deduplicated server-side — preventing double-transactions on network retries (pattern used by Stripe, Razorpay)
-- Designed event-driven background job system with Inngest: per-user throttling, daily recurring transaction processing, AI-generated monthly financial reports, 6-hourly budget alerts
-- Integrated Google Gemini 2.5 Flash for receipt OCR with parallel image upload to Supabase Storage; structured JSON output validated before DB write; receipt URL persisted on transaction row
-- Implemented tag-based cache invalidation with Next.js `unstable_cache`; cached data served in <10ms while guaranteeing freshness within seconds of any mutation
-- Built per-category budget tracking system with real-time monthly spend aggregation using Prisma `groupBy`; supports upsert semantics with `@@unique([userId, category])` constraint
-- Secured all routes via ArcJet middleware chain (bot detection + shield + token-bucket rate limiting); typed error hierarchy maps Prisma constraint violations to HTTP-equivalent status codes
-- Achieved 43 passing unit tests using Vitest with full mock isolation; CI/CD pipeline via GitHub Actions runs tests + build on every pull request against a disposable Postgres service container
 
 ---
 
@@ -59,8 +83,8 @@ A production-grade personal finance management platform built with Next.js 15, d
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/YOUR_USERNAME/welth-upgraded
-cd welth-upgraded
+git clone https://github.com/linganago/welth-final
+cd welth-final
 npm install --legacy-peer-deps
 
 # 2. Copy env file and fill in your keys
@@ -72,33 +96,61 @@ npx prisma migrate deploy
 # 4. Generate Prisma client
 npx prisma generate
 
-# 5. Start dev server
+# 5. Start dev server (Terminal 1)
 npm run dev
 
-# 6. (Optional) Run Inngest dev server in a second terminal
+# 6. Start Inngest dev server (Terminal 2)
 npx inngest-cli@latest dev
 ```
 
+Open [http://localhost:3000](http://localhost:3000) and [http://localhost:8288](http://localhost:8288) (Inngest dashboard).
+
 ## Environment variables
 
-See `.env.example` for all required variables. Key services:
-- **Supabase** — database + receipt image storage
-- **Clerk** — authentication
-- **Gemini** — AI receipt scanning
-- **Resend** — transactional email
-- **ArcJet** — security
-- **Inngest** — background jobs
-- **Sentry** — error monitoring (optional in dev)
+See `.env.example` for all required variables.
+
+| Variable | Service | Required |
+|---|---|---|
+| `DATABASE_URL` | Supabase | Yes |
+| `DIRECT_URL` | Supabase | Yes |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk | Yes |
+| `CLERK_SECRET_KEY` | Clerk | Yes |
+| `GEMINI_API_KEY` | Google AI Studio | Yes |
+| `RESEND_API_KEY` | Resend | Yes |
+| `ARCJET_KEY` | ArcJet | Yes |
+| `INNGEST_EVENT_KEY` | Inngest | Yes |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase Storage | Yes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Storage | Yes |
+| `SENTRY_DSN` | Sentry | Optional |
 
 ## Running tests
 
 ```bash
-# Unit tests (no DB required)
+# Unit tests — 43 tests, no DB required, runs in ~2 seconds
 npm test
 
-# Integration tests (requires TEST_DATABASE_URL in .env.test)
+# Integration tests — requires real Postgres (set TEST_DATABASE_URL in .env.test)
 npm run test:integration
+
+# E2E tests — public auth flow tests, no credentials needed
+npx playwright test e2e/auth.spec.js
 
 # Coverage report
 npm run test:coverage
+```
+
+---
+
+## Project structure
+
+```
+├── actions/          # Next.js Server Actions (business logic)
+├── app/              # Next.js App Router pages and layouts
+├── components/       # Reusable React components
+├── e2e/              # Playwright E2E tests
+├── emails/           # React Email templates
+├── hooks/            # Custom React hooks
+├── lib/              # Shared utilities (Prisma, cache, errors, logger)
+├── prisma/           # Schema and migrations
+└── __tests__/        # Vitest unit and integration tests
 ```
