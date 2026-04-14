@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+// import { auth } from "@clerk/nextjs/server";
 import { db } from "../lib/prisma";
 import { revalidatePath } from "next/cache";
 import { revalidateTransactionCache } from "../lib/cache";
@@ -18,6 +18,8 @@ import { calculateNextRecurringDate } from "../lib/recurring-utils";
 import { uploadReceipt } from "../lib/supabase-storage";
 import logger from "../lib/logger";
 import { inngest } from "../lib/inngest/client";
+import { currentUser } from "@clerk/nextjs/server";
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,16 +33,18 @@ const serializeTransaction = (obj) => ({
 });
 
 async function resolveUser() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) throw new UnauthorizedError();
+  const clerkUser = await currentUser();
+
+  if (!clerkUser) throw new UnauthorizedError();
 
   const user = await db.user.findUnique({
-    where: { clerkUserId },
-    select: { id: true, email: true, name: true },
+    where: { clerkUserId: clerkUser.id },
+    select: { id: true },
   });
+
   if (!user) throw new UnauthorizedError("User record not found.");
 
-  return { clerkUserId, user };
+  return { user };
 }
 
 // ---------------------------------------------------------------------------

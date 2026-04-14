@@ -1,11 +1,15 @@
 "use server";
 
 import { db } from "../lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+// import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withBudgetCache, revalidateUserCache } from "../lib/cache";
 import { UnauthorizedError, ValidationError } from "../lib/errors";
 import logger from "../lib/logger";
+
+import { currentUser } from "@clerk/nextjs/server";
+
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -18,13 +22,17 @@ const serializeBudget = (b) => ({
 });
 
 async function resolveUser() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) throw new UnauthorizedError();
+  const clerkUser = await currentUser();
+
+  if (!clerkUser) throw new UnauthorizedError();
+
   const user = await db.user.findUnique({
-    where: { clerkUserId },
+    where: { clerkUserId: clerkUser.id },
     select: { id: true },
   });
+
   if (!user) throw new UnauthorizedError("User record not found.");
+
   return { user };
 }
 

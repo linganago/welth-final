@@ -3,7 +3,7 @@
 import aj from "../lib/arcjet";
 import { db } from "../lib/prisma";
 import { request } from "@arcjet/next";
-import { auth } from "@clerk/nextjs/server";
+// import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
   withAccountsCache,
@@ -17,6 +17,8 @@ import {
   ValidationError,
   RateLimitError,
 } from "../lib/errors";
+import { currentUser } from "@clerk/nextjs/server";
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,16 +32,18 @@ const serializeTransaction = (obj) => {
 };
 
 async function resolveUser() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) throw new UnauthorizedError();
+  const clerkUser = await currentUser();
+
+  if (!clerkUser) throw new UnauthorizedError();
 
   const user = await db.user.findUnique({
-    where: { clerkUserId },
+    where: { clerkUserId: clerkUser.id },
     select: { id: true },
   });
+
   if (!user) throw new UnauthorizedError("User record not found.");
 
-  return { clerkUserId, user };
+  return { user };
 }
 
 // ---------------------------------------------------------------------------
