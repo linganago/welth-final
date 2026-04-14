@@ -7,7 +7,7 @@
 
 A **production-grade personal finance management platform** built with Next.js 15 App Router, demonstrating advanced full-stack engineering patterns used at top product companies including idempotency, cursor pagination, event-driven architecture, and AI integration.
 
-**Live demo:** [welth-final-mds3vkng5-linganagoudas-projects.vercel.app](https://welth-final-mds3vkng5-linganagoudas-projects.vercel.app)
+**Live demo:** [welth-final.vercel.app/](https://welth-final.vercel.app/)
 
 ---
 
