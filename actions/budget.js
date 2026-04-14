@@ -18,7 +18,9 @@ import { auth,currentUser } from "@clerk/nextjs/server";
 
 const serializeBudget = (b) => ({
   ...b,
-  amount: b.amount?.toNumber ? b.amount.toNumber() : b.amount,
+  amount: b.amount?.toNumber
+  ? b.amount.toNumber()
+  : Number(b.amount || 0),
 });
 
 async function resolveUser() {
@@ -122,13 +124,20 @@ export async function getAllBudgetsWithProgress() {
     ]);
 
     const spendingMap = Object.fromEntries(
-      expensesByCategory.map((e) => [e.category, e._sum.amount?.toNumber() ?? 0])
-    );
+  expensesByCategory.map((e) => [
+    e.category,
+    e._sum.amount?.toNumber
+      ? e._sum.amount.toNumber()
+      : Number(e._sum.amount || 0),
+  ])
+);
 
     const totalSpending = Object.values(spendingMap).reduce((a, b) => a + b, 0);
 
     return budgets.map((b) => {
-      const budgetAmount = b.amount.toNumber();
+      const budgetAmount = b.amount?.toNumber
+  ? b.amount.toNumber()
+  : Number(b.amount || 0);
       const spent = b.category === null ? totalSpending : (spendingMap[b.category] ?? 0);
       const percentage = budgetAmount > 0 ? Math.min(100, (spent / budgetAmount) * 100) : 0;
 

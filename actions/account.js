@@ -23,8 +23,13 @@ const serializeDecimal = (obj) => {
 
   return {
     ...obj,
-    balance: obj.balance?.toNumber ? obj.balance.toNumber() : obj.balance,
-    amount: obj.amount?.toNumber ? obj.amount.toNumber() : obj.amount,
+    balance: obj.balance?.toNumber
+      ? obj.balance.toNumber()
+      : Number(obj.balance),
+
+    amount: obj.amount?.toNumber
+      ? obj.amount.toNumber()
+      : Number(obj.amount),
   };
 };
 

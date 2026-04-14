@@ -29,7 +29,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const serializeTransaction = (obj) => ({
   ...obj,
-  amount: obj.amount?.toNumber ? obj.amount.toNumber() : obj.amount,
+  amount: obj.amount?.toNumber
+    ? obj.amount.toNumber()
+    : Number(obj.amount || 0),
 });
 
 async function resolveUser() {

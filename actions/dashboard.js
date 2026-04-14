@@ -25,10 +25,18 @@ import { auth,currentUser } from "@clerk/nextjs/server";
 // ---------------------------------------------------------------------------
 
 const serializeTransaction = (obj) => {
-  const serialized = { ...obj };
-  if (obj.balance?.toNumber) serialized.balance = obj.balance.toNumber();
-  if (obj.amount?.toNumber) serialized.amount = obj.amount.toNumber();
-  return serialized;
+  if (!obj) return obj;
+
+  return {
+    ...obj,
+    balance: obj.balance?.toNumber
+      ? obj.balance.toNumber()
+      : Number(obj.balance || 0),
+
+    amount: obj.amount?.toNumber
+      ? obj.amount.toNumber()
+      : Number(obj.amount || 0),
+  };
 };
 
 async function resolveUser() {

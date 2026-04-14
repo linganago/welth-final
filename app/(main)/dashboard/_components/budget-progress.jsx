@@ -31,7 +31,7 @@ export function BudgetProgress({ initialBudget, currentExpenses }) {
   } = useFetch(updateBudget);
 
   const percentUsed = initialBudget
-    ? (currentExpenses / initialBudget.amount) * 100
+    ? (currentExpenses / Number(initialBudget.amount || 1)) * 100
     : 0;
 
   const handleUpdateBudget = async () => {
@@ -105,7 +105,7 @@ export function BudgetProgress({ initialBudget, currentExpenses }) {
                   {initialBudget
                     ? `$${currentExpenses.toFixed(
                         2
-                      )} of $${initialBudget.amount.toFixed(2)} spent`
+                      )} of $${Number(initialBudget.amount).toFixed(2)} spent`
                     : "No budget set"}
                 </CardDescription>
                 <Button
