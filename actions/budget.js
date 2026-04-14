@@ -11,6 +11,12 @@ import logger from "../lib/logger";
 // Helpers
 // ---------------------------------------------------------------------------
 
+
+const serializeBudget = (b) => ({
+  ...b,
+  amount: b.amount?.toNumber ? b.amount.toNumber() : b.amount,
+});
+
 async function resolveUser() {
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) throw new UnauthorizedError();
@@ -51,9 +57,11 @@ export async function getCurrentBudget(accountId) {
     });
 
     return {
-      budget: budget ? { ...budget, amount: budget.amount.toNumber() } : null,
-      currentExpenses: expenses._sum.amount ? expenses._sum.amount.toNumber() : 0,
-    };
+  budget: budget ? serializeBudget(budget) : null,
+  currentExpenses: expenses._sum.amount
+    ? expenses._sum.amount.toNumber()
+    : 0,
+}
   } catch (error) {
     logger.error("Error fetching budget", error);
     throw error;
@@ -113,9 +121,11 @@ export async function getAllBudgetsWithProgress() {
         isOverBudget: spent > budgetAmount,
       };
     });
-  } catch (error) {
+  }  catch (error) {
     logger.error("Error fetching all budgets", error);
-    throw error;
+    // Return empty array instead of throwing so the dashboard page
+    // still renders even if the budget query fails (e.g. DB connection issue).
+    return [];
   }
 }
 
@@ -138,30 +148,53 @@ export async function upsertBudget({ amount, category = null }) {
       throw new ValidationError("Budget amount must be a positive number.");
     }
 
-    const budget = await db.budget.upsert({
-      where: {
-        // Prisma requires the exact @@unique field combination
-        userId_category: { userId: user.id, category },
-      },
-      update: { amount },
-      create: { userId: user.id, amount, category },
-    });
+    let budget;
 
-    logger.info("Budget upserted", {
-      userId: user.id,
-      category: category ?? "global",
-      amount,
-    });
+    // ✅ FIX: handle NULL category separately
+    if (category === null) {
+      const existing = await db.budget.findFirst({
+        where: { userId: user.id, category: null },
+      });
+
+      if (existing) {
+        budget = await db.budget.update({
+          where: { id: existing.id },
+          data: { amount },
+        });
+      } else {
+        budget = await db.budget.create({
+          data: {
+            userId: user.id,
+            amount,
+            category: null,
+          },
+        });
+      }
+    } else {
+      // ✅ keep original behavior for categories
+      budget = await db.budget.upsert({
+        where: {
+          userId_category: {
+            userId: user.id,
+            category,
+          },
+        },
+        update: { amount },
+        create: { userId: user.id, amount, category },
+      });
+    }
 
     revalidateUserCache(user.id);
     revalidatePath("/dashboard");
 
     return {
       success: true,
-      data: { ...budget, amount: budget.amount.toNumber() },
+      data: {
+        ...budget,
+        amount: budget.amount.toNumber(),
+      },
     };
   } catch (error) {
-    logger.error("Error upserting budget", error);
     return { success: false, error: error.message };
   }
 }

@@ -1,7 +1,19 @@
-import React from "react";
+import { BarLoader } from "react-spinners";
+import { Suspense } from "react";
 
-const MainLayout = ({ children }) => {
-  return <div className="container mx-auto my-32">{children}</div>;
-};
-
-export default MainLayout;
+export default function Layout({ children }) {
+  return (
+    <div className="px-5">
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-6xl font-bold tracking-tight gradient-title">
+          Dashboard
+        </h1>
+      </div>
+      <Suspense
+        fallback={<BarLoader className="mt-4" width={"100%"} color="#9333ea" />}
+      >
+        {children}
+      </Suspense>
+    </div>
+  );
+}

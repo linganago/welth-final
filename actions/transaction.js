@@ -25,7 +25,7 @@ import { inngest } from "../lib/inngest/client";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const serializeAmount = (obj) => ({
+const serializeTransaction = (obj) => ({
   ...obj,
   amount: obj.amount?.toNumber ? obj.amount.toNumber() : obj.amount,
 });
@@ -66,7 +66,7 @@ export async function createTransaction(data, idempotencyKey) {
       where: { idempotencyKey },
     });
     if (existing) {
-      return { success: true, data: serializeAmount(existing), idempotent: true };
+      return { success: true, data: serializeTransaction(transaction) };
     }
   }
 
@@ -153,7 +153,7 @@ export async function createTransaction(data, idempotencyKey) {
   revalidatePath("/dashboard");
   revalidatePath(`/account/${transaction.accountId}`);
 
-  return { success: true, data: serializeAmount(transaction) };
+  return { success: true, data: serializeTransaction(transaction) };
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ export async function getTransaction(id) {
   });
   if (!transaction) throw new NotFoundError("Transaction");
 
-  return serializeAmount(transaction);
+  return serializeTransaction(transaction);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ export async function updateTransaction(id, data) {
   revalidatePath("/dashboard");
   revalidatePath(`/account/${transaction.accountId}`);
 
-  return { success: true, data: serializeAmount(transaction) };
+  return { success: true, data: serializeTransaction(transaction) };
 }
 
 // ---------------------------------------------------------------------------
@@ -283,9 +283,13 @@ export async function getUserTransactions({
   const nextCursor = hasNextPage ? items[items.length - 1].id : null;
 
   return {
-    success: true,
-    data: { items: items.map(serializeAmount), nextCursor, hasNextPage },
-  };
+  success: true,
+  data: {
+    items: items.map(serializeTransaction),
+    nextCursor,
+    hasNextPage,
+  },
+};
 }
 
 // ---------------------------------------------------------------------------

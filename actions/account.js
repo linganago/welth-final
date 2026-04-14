@@ -15,19 +15,26 @@ import {
 // ---------------------------------------------------------------------------
 
 const serializeDecimal = (obj) => {
-  const serialized = { ...obj };
-  if (obj.balance?.toNumber) serialized.balance = obj.balance.toNumber();
-  if (obj.amount?.toNumber) serialized.amount = obj.amount.toNumber();
-  return serialized;
+  if (!obj) return obj;
+
+  return {
+    ...obj,
+    balance: obj.balance?.toNumber ? obj.balance.toNumber() : obj.balance,
+    amount: obj.amount?.toNumber ? obj.amount.toNumber() : obj.amount,
+  };
 };
 
-const formatTransaction = (t) => ({
-  ...serializeDecimal(t),
-  formattedDate: format(new Date(t.date), "PP"),
-  formattedNextRecurringDate: t.nextRecurringDate
-    ? format(new Date(t.nextRecurringDate), "PP")
-    : null,
-});
+const formatTransaction = (t) => {
+  const serialized = serializeDecimal(t);
+
+  return {
+    ...serialized,
+    formattedDate: format(new Date(t.date), "PP"),
+    formattedNextRecurringDate: t.nextRecurringDate
+      ? format(new Date(t.nextRecurringDate), "PP")
+      : null,
+  };
+};
 
 async function resolveUser() {
   const { userId: clerkUserId } = await auth();
@@ -43,15 +50,9 @@ async function resolveUser() {
 }
 
 // ---------------------------------------------------------------------------
-// GET ACCOUNT WITH PAGINATED TRANSACTIONS
+// GET ACCOUNT WITH TRANSACTIONS
 // ---------------------------------------------------------------------------
 
-/**
- * Returns account metadata plus the first page of transactions.
- * Subsequent pages are fetched via getUserTransactions() in actions/transaction.js.
- *
- * @param {string} accountId
- */
 export async function getAccountWithTransactions(accountId) {
   const { user } = await resolveUser();
 
@@ -60,8 +61,6 @@ export async function getAccountWithTransactions(accountId) {
     include: {
       transactions: {
         orderBy: { date: "desc" },
-        // Return only the first page of transactions to avoid loading
-        // the entire history on initial render.
         take: 20,
       },
       _count: { select: { transactions: true } },
@@ -90,10 +89,8 @@ export async function bulkDeleteTransactions(transactionIds) {
 
     if (transactions.length === 0) return { success: true };
 
-    // Group balance reversal by account
     const accountBalanceChanges = transactions.reduce((acc, t) => {
       const amount = t.amount.toNumber();
-      // Reversing the effect: expense → add back, income → subtract back
       const change = t.type === "EXPENSE" ? amount : -amount;
       acc[t.accountId] = (acc[t.accountId] || 0) + change;
       return acc;

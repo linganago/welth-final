@@ -133,7 +133,7 @@ export function DashboardOverview({ accounts, transactions }) {
                     ) : (
                       <ArrowUpRight className="mr-1 h-4 w-4" />
                     )}
-                    ${transaction.amount.toFixed(2)}
+                    ${Number(transaction.amount).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -155,7 +155,7 @@ export function DashboardOverview({ accounts, transactions }) {
               No expenses this month
             </p>
           ) : (
-            <div className="h-[280px] sm:h-[320px] md:h-[360px]">
+            <div className="h-[280px] svalue.toFixed(2)m:h-[320px] md:h-[360px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -166,7 +166,7 @@ export function DashboardOverview({ accounts, transactions }) {
                     fill="#8884d8"
                     dataKey="value"
                     label={({ name, value }) =>
-                      `${name}: $${value.toFixed(2)}`
+                      `${name}: $${Number(value).toFixed(2)}`
                     }
                   >
                     {pieChartData.map((entry, index) => (
@@ -177,7 +177,7 @@ export function DashboardOverview({ accounts, transactions }) {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value) => `$${value.toFixed(2)}`}
+                    formatter={(value) => `$${Number(value).toFixed(2)}`}
                     contentStyle={{
                       backgroundColor: "hsl(var(--popover))",
                       border: "1px solid hsl(var(--border))",
