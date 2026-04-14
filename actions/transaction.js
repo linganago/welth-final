@@ -62,13 +62,18 @@ export async function createTransaction(data, idempotencyKey) {
 
   // Idempotency — return existing transaction without side effects
   if (idempotencyKey) {
-    const existing = await db.transaction.findUnique({
-      where: { idempotencyKey },
-    });
-    if (existing) {
-      return { success: true, data: serializeTransaction(transaction) };
-    }
+  const existing = await db.transaction.findUnique({
+    where: { idempotencyKey },
+  });
+
+  if (existing) {
+    return {
+      success: true,
+      data: serializeTransaction(existing),
+      idempotent: true,
+    };
   }
+}
 
   // Server-side validation
   const parseResult = transactionSchema.safeParse(data);
