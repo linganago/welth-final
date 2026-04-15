@@ -7,21 +7,25 @@ import Link from "next/link";
 import { db } from "../lib/prisma";
 export const dynamic = "force-dynamic";
 async function getStats() {
-  const [userCount, transactionCount, volumeResult] = await Promise.all([
-    db.user.count(),
-    db.transaction.count(),
-    db.transaction.aggregate({
-      _sum: { amount: true },
-    }),
-  ]);
-
-  const volume = volumeResult._sum.amount?.toNumber() ?? 0;
-
-  return { userCount, transactionCount, volume };
+  try {
+    const [userCount, transactionCount, volumeResult] = await Promise.all([
+      db.user.count(),
+      db.transaction.count(),
+      db.transaction.aggregate({ _sum: { amount: true } }),
+    ]);
+    const volume = volumeResult._sum.amount?.toNumber() ?? 0;
+    return { userCount, transactionCount, volume };
+  } catch {
+    return { userCount: 0, transactionCount: 0, volume: 0 };
+  }
 }
 
 async function getTestimonials() {
-  return db.testimonial.findMany({ orderBy: { createdAt: "asc" } });
+  try {
+    return await db.testimonial.findMany({ orderBy: { createdAt: "asc" } });
+  } catch {
+    return [];
+  }
 }
 
 function formatVolume(volume) {
