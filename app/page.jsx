@@ -5,7 +5,7 @@ import { featuresData, howItWorksData } from "../data/landing";
 import HeroSection from "../components/hero";
 import Link from "next/link";
 import { db } from "../lib/prisma";
-
+export const dynamic = "force-dynamic";
 async function getStats() {
   const [userCount, transactionCount, volumeResult] = await Promise.all([
     db.user.count(),
