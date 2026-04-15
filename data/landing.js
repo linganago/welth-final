@@ -3,31 +3,13 @@ import {
   Receipt,
   PieChart,
   CreditCard,
-  Globe,
   Zap,
+  RefreshCcw,
+  ShieldAlert,
+  Mail,
 } from "lucide-react";
 
-// Stats Data
-export const statsData = [
-  {
-    value: "50K+",
-    label: "Active Users",
-  },
-  {
-    value: "$2B+",
-    label: "Transactions Tracked",
-  },
-  {
-    value: "99.9%",
-    label: "Uptime",
-  },
-  {
-    value: "4.9/5",
-    label: "User Rating",
-  },
-];
-
-// Features Data
+// Features Data — only what's actually implemented
 export const featuresData = [
   {
     icon: <BarChart3 className="h-8 w-8 text-blue-600" />,
@@ -39,27 +21,42 @@ export const featuresData = [
     icon: <Receipt className="h-8 w-8 text-blue-600" />,
     title: "Smart Receipt Scanner",
     description:
-      "Extract data automatically from receipts using advanced AI technology",
+      "Upload a photo of any receipt — Gemini AI extracts amount, date, and category automatically",
   },
   {
     icon: <PieChart className="h-8 w-8 text-blue-600" />,
     title: "Budget Planning",
-    description: "Create and manage budgets with intelligent recommendations",
+    description:
+      "Set monthly budgets per category and get alerted when you hit 80% of your limit",
   },
   {
     icon: <CreditCard className="h-8 w-8 text-blue-600" />,
     title: "Multi-Account Support",
-    description: "Manage multiple accounts and credit cards in one place",
+    description: "Manage multiple savings and current accounts in one place",
   },
   {
-    icon: <Globe className="h-8 w-8 text-blue-600" />,
-    title: "Multi-Currency",
-    description: "Support for multiple currencies with real-time conversion",
+    icon: <RefreshCcw className="h-8 w-8 text-blue-600" />,
+    title: "Recurring Transactions",
+    description:
+      "Set up daily, weekly, or monthly recurring transactions — processed automatically in the background",
+  },
+  {
+    icon: <ShieldAlert className="h-8 w-8 text-blue-600" />,
+    title: "Anomaly Detection",
+    description:
+      "Statistically flags transactions that are unusually high compared to your 3-month category average",
+  },
+  {
+    icon: <Mail className="h-8 w-8 text-blue-600" />,
+    title: "Monthly AI Reports",
+    description:
+      "Receive AI-generated financial summaries by email at the end of every month",
   },
   {
     icon: <Zap className="h-8 w-8 text-blue-600" />,
     title: "Automated Insights",
-    description: "Get automated financial insights and recommendations",
+    description:
+      "Get automated financial insights and recommendations powered by Gemini",
   },
 ];
 
@@ -82,27 +79,5 @@ export const howItWorksData = [
     title: "3. Get Insights",
     description:
       "Receive AI-powered insights and recommendations to optimize your finances",
-  },
-];
-
-// Testimonials Data
-export const testimonialsData = [
-  {
-    name: "Sarah Johnson",
-    role: "Small Business Owner",
-    quote:
-      "Welth has transformed how I manage my business finances. The AI insights have helped me identify cost-saving opportunities I never knew existed.",
-  },
-  {
-    name: "Michael Chen",
-    role: "Freelancer",
-    quote:
-      "The receipt scanning feature saves me hours each month. Now I can focus on my work instead of manual data entry and expense tracking.",
-  },
-  {
-    name: "Emily Rodriguez",
-    role: "Financial Advisor",
-    quote:
-      "I recommend Welth to all my clients. The multi-currency support and detailed analytics make it perfect for international investors.",
   },
 ];

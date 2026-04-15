@@ -1,16 +1,46 @@
 import React from "react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
-import {
-  featuresData,
-  howItWorksData,
-  statsData,
-  testimonialsData,
-} from "../data/landing";
+import { featuresData, howItWorksData } from "../data/landing";
 import HeroSection from "../components/hero";
 import Link from "next/link";
+import { db } from "../lib/prisma";
 
-const LandingPage = () => {
+async function getStats() {
+  const [userCount, transactionCount, volumeResult] = await Promise.all([
+    db.user.count(),
+    db.transaction.count(),
+    db.transaction.aggregate({
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const volume = volumeResult._sum.amount?.toNumber() ?? 0;
+
+  return { userCount, transactionCount, volume };
+}
+
+async function getTestimonials() {
+  return db.testimonial.findMany({ orderBy: { createdAt: "asc" } });
+}
+
+function formatVolume(volume) {
+  if (volume >= 1_000_000) return `$${(volume / 1_000_000).toFixed(1)}M+`;
+  if (volume >= 1_000) return `$${(volume / 1_000).toFixed(1)}K+`;
+  return `$${volume.toFixed(0)}`;
+}
+
+const LandingPage = async () => {
+  const [{ userCount, transactionCount, volume }, testimonials] =
+    await Promise.all([getStats(), getTestimonials()]);
+
+  const statsData = [
+    { value: `${userCount}+`, label: "Registered Users" },
+    { value: `${transactionCount.toLocaleString()}+`, label: "Transactions Logged" },
+    { value: formatVolume(volume), label: "Total Volume Tracked" },
+    { value: "Open Source", label: "Built in Public" },
+  ];
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
@@ -71,30 +101,32 @@ const LandingPage = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="py-20">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-16">
-            What Our Users Say
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonialsData.map((testimonial, index) => (
-              <Card key={index} className="p-6">
-                <CardContent className="pt-4">
-                  <div className="flex items-center mb-4">
-                    <div className="ml-4">
-                      <div className="font-semibold">{testimonial.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {testimonial.role}
+      {testimonials.length > 0 && (
+        <section id="testimonials" className="py-20">
+          <div className="container mx-auto px-4">
+            <h2 className="text-3xl font-bold text-center mb-16">
+              What Our Users Say
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {testimonials.map((testimonial) => (
+                <Card key={testimonial.id} className="p-6">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center mb-4">
+                      <div className="ml-4">
+                        <div className="font-semibold">{testimonial.name}</div>
+                        <div className="text-sm text-gray-600">
+                          {testimonial.role}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <p className="text-gray-600">{testimonial.quote}</p>
-                </CardContent>
-              </Card>
-            ))}
+                    <p className="text-gray-600">{testimonial.quote}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* CTA Section */}
       <section className="py-20 bg-blue-600">
@@ -103,15 +135,14 @@ const LandingPage = () => {
             Ready to Take Control of Your Finances?
           </h2>
           <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of users who are already managing their finances
-            smarter with Welth
+            Join others who are already managing their finances smarter with Welth
           </p>
           <Link href="/dashboard">
             <Button
               size="lg"
               className="bg-white text-blue-600 hover:bg-blue-50 animate-bounce"
             >
-              Start Free Trial
+              Get Started
             </Button>
           </Link>
         </div>
